@@ -1,0 +1,49 @@
+name: Update Sub
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          
+      - name: Fetch and merge configs
+        run: |
+          python -c "
+          import requests, base64
+          result = set()
+          with open('sources.txt') as f:
+              sources = [x.strip() for x in f if x.strip()]
+          for url in sources:
+              try:
+                  r = requests.get(url, timeout=20)
+                  text = r.text.strip()
+                  try:
+                      if '://' not in text:
+                          text = base64.b64decode(text).decode('utf-8', errors='ignore')
+                  except: pass
+                  for line in text.splitlines():
+                      line=line.strip()
+                      if '://' in line:
+                          result.add(line)
+              except Exception as e:
+                  print(f'fail {url}: {e}')
+          with open('link-sub.txt','w',encoding='utf-8') as out:
+              out.write('\n'.join(sorted(result)))
+          print(f'Done: {len(result)} configs')
+          "
+      - name: Commit
+        run: |
+          git config --local user.email 'bot@github.com'
+          git config --local user.name 'update-bot'
+          git add link-sub.txt
+          git commit -m 'auto update' || exit 0
+          git push
