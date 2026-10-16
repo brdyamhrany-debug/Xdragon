@@ -1,0 +1,368 @@
+
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Xdragon Search</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;background:#080d18;color:#eef4ff;
+ font-family:Tahoma,Arial,sans-serif;min-height:100vh
+}
+main{max-width:950px;margin:auto;padding:24px 15px}
+header{display:flex;align-items:center;gap:12px;margin-bottom:25px}
+.logo{
+ width:54px;height:54px;border-radius:16px;
+ display:grid;place-items:center;
+ background:linear-gradient(135deg,#54e6d2,#7185ff);
+ color:#07121c;font-size:28px;font-weight:bold
+}
+h1{font-size:23px;margin:0}
+header p{color:#94a3b8;font-size:11px}
+.panel{
+ background:#111a2b;border:1px solid #28354c;
+ border-radius:20px;padding:22px;margin-bottom:18px
+}
+.hero{text-align:center}
+.hero h2{font-size:25px}
+.hero p{color:#9aaac0;font-size:13px;line-height:2}
+.search{
+ display:flex;gap:8px;margin-top:20px
+}
+input{
+ flex:1;min-width:0;padding:14px;
+ background:#080f1c;border:1px solid #34445e;
+ border-radius:12px;color:white;font-size:14px
+}
+button{
+ padding:12px 16px;border:1px solid #286c64;
+ border-radius:11px;background:#123c3a;
+ color:#b4fff4;cursor:pointer
+}
+.filters{display:flex;gap:7px;flex-wrap:wrap;margin-top:15px}
+.filters button{font-size:11px;background:#172238;border-color:#30405a}
+.filters button.active{border-color:#54e6d2;color:#54e6d2}
+.summary{font-size:12px;color:#9aaac0;margin:20px 3px}
+.server{
+ padding:15px;border-top:1px solid #26334b;
+ display:flex;justify-content:space-between;
+ align-items:center;gap:12px
+}
+.server:first-child{border-top:0}
+.server-name{font-size:13px;font-weight:bold;overflow-wrap:anywhere}
+.host{font-size:11px;color:#95a5bb;margin-top:7px;direction:ltr}
+.protocol{font-size:10px;color:#54e6d2;margin-top:8px}
+.actions{display:flex;gap:7px}
+.actions button{font-size:11px;padding:9px}
+.actions .copy{background:#153d3a}
+.empty{text-align:center;padding:30px 10px;color:#94a3b8;font-size:13px;line-height:2}
+.notice{
+ color:#e5d3a0;background:#252014;
+ border:1px solid #554621;border-radius:12px;
+ padding:13px;font-size:11px;line-height:2
+}
+a{color:#54e6d2}
+footer{text-align:center;color:#8291a8;font-size:11px;line-height:2;padding:20px}
+@media(max-width:550px){
+ main{padding:15px 10px}
+ .panel{padding:15px}
+ .search{flex-direction:column}
+ .server{align-items:flex-start}
+ .actions{flex-direction:column}
+ .hero h2{font-size:21px}
+}
+</style>
+</head>
+<body>
+<main>
+<header>
+ <div class="logo">X</div>
+ <div>
+  <h1>Xdragon Search</h1>
+  <p>SMART CONFIGURATION SEARCH</p>
+ </div>
+</header>
+
+<section class="panel hero">
+ <h2>جست‌وجوی هوشمند سرورها</h2>
+ <p>
+ نام کشور، IP، دامنه یا پروتکل را بنویس.
+ کانفیگ‌های مشابه از فایل sub.txt نمایش داده می‌شوند.
+ </p>
+
+ <div class="search">
+  <input id="query" placeholder="مثلاً Germany، VLESS یا IP..."
+         autocomplete="off">
+  <button id="clear">پاک کردن</button>
+ </div>
+
+ <div class="filters" id="filters">
+  <button class="active" data-type="all">همه</button>
+  <button data-type="vless">VLESS</button>
+  <button data-type="vmess">VMess</button>
+  <button data-type="trojan">Trojan</button>
+  <button data-type="ss">Shadowsocks</button>
+ </div>
+</section>
+
+<div class="summary" id="summary">در حال دریافت کانفیگ‌ها...</div>
+
+<section class="panel" style="padding:0" id="results">
+ <div class="empty">در حال اتصال به GitHub...</div>
+</section>
+
+<section class="notice">
+ توجه: این صفحه فقط جست‌وجو و کپی کانفیگ انجام می‌دهد.
+ اتصال واقعی VPN باید از طریق یک برنامه سازگار انجام شود.
+ از کانفیگ‌های ناشناس با احتیاط استفاده کن.
+</section>
+
+<footer>
+ منبع:
+ <a href="https://github.com/brdyamhrany-debug/Xdragon/blob/main/sub.txt"
+    target="_blank" rel="noopener">Xdragon / sub.txt</a>
+</footer>
+</main>
+
+<script>
+const RAW =
+"https://raw.githubusercontent.com/brdyamhrany-debug/Xdragon/main/sub.txt";
+
+let configs = [];
+let activeType = "all";
+let loaded = false;
+
+const $ = id => document.getElementById(id);
+
+function decodeText(text) {
+  try { return decodeURIComponent(text); }
+  catch { return text; }
+}
+
+function parseConfig(line, index) {
+  line = line.trim();
+
+  if (!line || line.startsWith("#")) return null;
+
+  const match = line.match(/^([a-zA-Z][\w+.-]*):\/\//);
+  if (!match) return null;
+
+  const protocol = match[1].toLowerCase();
+  const hash = line.indexOf("#");
+
+  let name = hash >= 0
+    ? decodeText(line.slice(hash + 1))
+    : "";
+
+  const addressPart = line.slice(0, hash < 0 ? line.length : hash);
+  const at = addressPart.lastIndexOf("@");
+
+  let host = "";
+  let port = "";
+
+  if (at >= 0) {
+    const authority = addressPart.slice(at + 1)
+      .split(/[/?]/)[0];
+
+    const colon = authority.lastIndexOf(":");
+
+    if (colon > 0) {
+      host = authority.slice(0, colon);
+      port = authority.slice(colon + 1);
+    } else {
+      host = authority;
+    }
+  }
+
+  if (protocol === "vmess" && !host) {
+    try {
+      let encoded = addressPart.slice("vmess://".length);
+      encoded = encoded.replace(/-/g, "+").replace(/_/g, "/");
+      encoded += "=".repeat((4 - encoded.length % 4) % 4);
+
+      const data = JSON.parse(
+        decodeURIComponent(escape(atob(encoded)))
+      );
+
+      host = data.add || "";
+      port = data.port || "";
+      name = name || data.ps || "";
+    } catch {}
+  }
+
+  return {
+    index,
+    raw: line,
+    protocol,
+    name: name || host || `Server ${index + 1}`,
+    host,
+    port,
+    searchable: (line + " " + name + " " + host)
+      .toLowerCase()
+  };
+}
+
+function escapeHTML(value) {
+  return String(value).replace(/[&<>"']/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[char]);
+}
+
+function render() {
+  const terms = $("query").value.trim().toLowerCase()
+    .split(/\s+/).filter(Boolean);
+
+  let found = configs.filter(config =>
+    terms.every(term => config.searchable.includes(term))
+  );
+
+  if (activeType !== "all") {
+    found = found.filter(config => {
+      if (activeType === "ss")
+        return ["ss", "shadowsocks"].includes(config.protocol);
+      return config.protocol === activeType;
+    });
+  }
+
+  $("summary").textContent =
+    `${found.length} نتیجه از ${configs.length} کانفیگ`;
+
+  if (!found.length) {
+    $("results").innerHTML =
+      `<div class="empty">${
+        loaded
+          ? "نتیجه‌ای پیدا نشد؛ عبارت دیگری را امتحان کن."
+          : "هنوز اطلاعاتی دریافت نشده است."
+      }</div>`;
+    return;
+  }
+
+  $("results").innerHTML = found.slice(0, 500).map(config => `
+    <article class="server">
+      <div>
+        <div class="server-name">${escapeHTML(config.name)}</div>
+        <div class="host">${escapeHTML(config.host || "Unknown host")}${
+          config.port ? ":" + escapeHTML(config.port) : ""
+        }</div>
+        <div class="protocol">${escapeHTML(config.protocol.toUpperCase())}</div>
+      </div>
+      <div class="actions">
+        <button class="copy" data-copy="${config.index}">کپی کانفیگ</button>
+        <button data-detail="${config.index}">جزئیات</button>
+      </div>
+    </article>
+  `).join("");
+
+  $("results").querySelectorAll("[data-copy]").forEach(button => {
+    button.addEventListener("click", async () => {
+      const config = configs.find(c =>
+        c.index === Number(button.dataset.copy)
+      );
+      if (!config) return;
+
+      try {
+        await navigator.clipboard.writeText(config.raw);
+        button.textContent = "کپی شد ✓";
+      } catch {
+        const area = document.createElement("textarea");
+        area.value = config.raw;
+        document.body.appendChild(area);
+        area.select();
+        document.execCommand("copy");
+        area.remove();
+        button.textContent = "کپی شد ✓";
+      }
+    });
+  });
+
+  $("results").querySelectorAll("[data-detail]").forEach(button => {
+    button.addEventListener("click", () => {
+      const config = configs.find(c =>
+        c.index === Number(button.dataset.detail)
+      );
+      if (!config) return;
+
+      const area = document.createElement("textarea");
+      area.value = config.raw;
+      area.readOnly = true;
+      area.style.cssText =
+        "width:100%;height:140px;background:#080f1c;color:#54e6d2;padding:12px;border:1px solid #34445e;border-radius:10px;direction:ltr";
+
+      const box = document.createElement("div");
+      box.className = "panel";
+      box.appendChild(area);
+
+      const old = $("detail");
+      if (old) old.remove();
+
+      box.id = "detail";
+      $("results").prepend(box);
+      area.focus();
+      area.select();
+    });
+  });
+}
+
+async function loadConfigs() {
+  try {
+    const response = await fetch(RAW, {cache: "no-store"});
+    if (!response.ok) throw new Error("GitHub unavailable");
+
+    const text = await response.text();
+
+    configs = text.split(/\r?\n/)
+      .map(parseConfig)
+      .filter(Boolean);
+
+    loaded = true;
+
+    if (!configs.length) {
+      $("results").innerHTML =
+        '<div class="empty">کانفیگ قابل شناسایی پیدا نشد.</div>';
+    }
+
+    render();
+  } catch (error) {
+    $("summary").textContent = "دریافت اطلاعات ناموفق بود";
+
+    $("results").innerHTML = `
+      <div class="empty">
+        فایل sub.txt بارگذاری نشد.<br>
+        اینترنت و دسترسی به GitHub را بررسی کن.<br>
+        <a href="${RAW}" target="_blank" rel="noopener">
+          باز کردن فایل خام
+        </a>
+      </div>`;
+  }
+}
+
+$("query").addEventListener("input", render);
+
+$("clear").addEventListener("click", () => {
+  $("query").value = "";
+  render();
+  $("query").focus();
+});
+
+$("filters").querySelectorAll("button").forEach(button => {
+  button.addEventListener("click", () => {
+    activeType = button.dataset.type;
+
+    $("filters").querySelectorAll("button").forEach(item =>
+      item.classList.toggle("active", item === button)
+    );
+
+    render();
+  });
+});
+
+loadConfigs();
+</script>
+</body>
+  </html>
