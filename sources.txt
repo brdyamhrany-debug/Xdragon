@@ -4,3 +4,5 @@ https://raw.githubusercontent.com/coldwater-10/V2Hub3/main/Split/Normal/trojan
 https://raw.githubusercontent.com/coldwater-10/V2Hub3/main/Split/Normal/vmess
 https://raw.githubusercontent.com/coldwater-10/V2Hub3/main/Split/Normal/vless
 https://raw.githubusercontent.com/10ium/V2ray-Config/main/Splitted-By-Protocol/vless.txt
+https://raw.githubusercontent.com/10ium/base64-encoder/main/encoded/10ium-V2rayCollector-mixed.txt
+
