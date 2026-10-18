@@ -55,4 +55,12 @@ https://raw.githubusercontent.com/Epodonios/v2ray-configs/refs/heads/main/Sub1.t
 https://raw.githubusercontent.com/Epodonios/v2ray-configs/refs/heads/main/Sub2.txt
 https://raw.githubusercontent.com/EEvanescence/4Diana/main/AllConfigsSub.txt
 https://raw.githubusercontent.com/EEvanescence/4Diana/main/By-protocol/vless.txt
+https://raw.githubusercontent.com/barry-far/V2ray-config/main/Sub1.txt
+https://raw.githubusercontent.com/barry-far/V2ray-config/main/Sub2.txt
+https://raw.githubusercontent.com/barry-far/V2ray-config/main/Sub3.txt
+https://raw.githubusercontent.com/barry-far/V2ray-config/main/Sub4.txt
+https://raw.githubusercontent.com/barry-far/V2ray-config/main/Sub5.txt
+https://raw.githubusercontent.com/barry-far/V2ray-config/main/Sub6.txt
+https://raw.githubusercontent.com/barry-far/V2ray-config/main/Sub7.txt
+https://raw.githubusercontent.com/barry-far/V2ray-config/main/Sub8.txt
 
