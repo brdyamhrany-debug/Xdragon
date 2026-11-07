@@ -1,0 +1,142 @@
+name: Auto Clean Sub
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cleanup-sub
+  cancel-in-progress: false
+
+jobs:
+  clean:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Clean sub.txt
+        run: |
+          python3 <<'PY'
+          import base64
+          import re
+          from pathlib import Path
+          from urllib.parse import urlsplit
+
+          file = Path("sub.txt")
+
+          if not file.exists():
+              print("sub.txt not found")
+              exit(0)
+
+          original = file.read_bytes()
+
+          if len(original) <= 60 * 1024 * 1024:
+              print("File is below 60 MB")
+              exit(0)
+
+          print("File exceeds 60 MB. Cleaning...")
+
+          schemes = (
+              "vmess://", "vless://", "trojan://",
+              "ss://", "ssr://", "hysteria://",
+              "hysteria2://", "hy2://", "tuic://",
+              "wireguard://", "socks://", "socks5://",
+              "http://", "https://"
+          )
+
+          text = original.decode("utf-8", errors="ignore")
+          encoded = False
+
+          try:
+              compact = re.sub(rb"\s+", b"", original)
+              decoded = base64.b64decode(
+                  compact + b"=" * (-len(compact) % 4),
+                  validate=True
+              )
+              decoded_text = decoded.decode("utf-8")
+
+              if any(s in decoded_text.lower() for s in schemes):
+                  text = decoded_text
+                  encoded = True
+          except Exception:
+              pass
+
+          valid = []
+          seen = set()
+          removed = 0
+          duplicates = 0
+
+          for line in text.splitlines():
+              line = line.strip()
+
+              if not line or line.startswith(("#", ";")):
+                  continue
+
+              lower = line.lower()
+              scheme = next(
+                  (s for s in schemes if lower.startswith(s)),
+                  None
+              )
+
+              if not scheme or any(c.isspace() for c in line):
+                  removed += 1
+                  continue
+
+              if scheme in ("http://", "https://",
+                            "socks://", "socks5://"):
+                  if not urlsplit(line).hostname:
+                      removed += 1
+                      continue
+              elif len(line) <= len(scheme):
+                  removed += 1
+                  continue
+
+              if line in seen:
+                  duplicates += 1
+                  continue
+
+              seen.add(line)
+              valid.append(line)
+
+          if not valid:
+              print("No valid configs found. Keeping original file.")
+              exit(1)
+
+          result = "\n".join(valid) + "\n"
+          output = result.encode("utf-8")
+
+          if encoded:
+              output = base64.b64encode(output)
+
+          if len(output) >= 100 * 1024 * 1024:
+              print("Still above GitHub 100 MB limit.")
+              exit(1)
+
+          file.write_bytes(output)
+
+          print("Removed invalid:", removed)
+          print("Removed duplicates:", duplicates)
+          print("New size:", round(len(output) / 1024 / 1024, 2), "MB")
+          PY
+
+      - name: Commit and Push
+        run: |
+          if git diff --quiet -- sub.txt; then
+            echo "No changes"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add sub.txt
+          git commit -m "Auto clean sub.txt"
+          git push origin HEAD:main
